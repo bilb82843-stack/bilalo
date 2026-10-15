@@ -25,7 +25,7 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # --- بيانات المحافظ ---
-BOT_TOKEN = "8526469344:AAHhWLZPmSh17mj0Z9EtqVTws-qZARZEiJU"
+BOT_TOKEN = "8876799668:AAEQ1GCNsAXK-qlxSyucuwJDQRMyaFKTvbk"
 SYRIATEL_CASH_NUM = "1758507658"
 CHAM_CASH_WALLET = "80b363fb29781a600ed48c02f6fc77fb"
 
@@ -64,10 +64,4 @@ async def start_charge(update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(charge_msg, parse_mode='MarkdownV2')
 
-# --- تشغيل البوت ---
-if __name__ == '__main__':
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(MessageHandler(filters.Text(["📥 شحن محفظة البوت"]), start_charge))
-
-    application.run_polling()
+#
