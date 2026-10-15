@@ -2,7 +2,18 @@ import os
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import ReplyKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    ConversationHandler,
+    filters,
+)
+
+# تعيين حالات المحادثة (Conversation States)
+WAITING_FOR_ACCOUNT_NAME, WAITING_FOR_ACCOUNT_PASS = range(2)
+WAITING_FOR_CHARGE_AMOUNT, WAITING_FOR_TRANSACTION_DETAILS = range(2, 4)
 
 # --- خادم وهمي لإرضاء منصة Render وتجاوز فحص الـ Port ---
 class DummyHandler(BaseHTTPRequestHandler):
@@ -25,19 +36,11 @@ threading.Thread(target=run_dummy_server, daemon=True).start()
 # --- كود البوت الرئيسي ---
 BOT_TOKEN = "8526469344:AAHhWLZPmSh17mj0Z9EtqVTws-qZARZEijU"
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_name = update.effective_user.first_name
-    user_id = update.effective_user.id
-    
-    # رسالة ترحيبية مطابقة للشكل في الصورة
-    welcome_msg = (
-        f"اهلاً بك {user_name} في Ultra Bot bilas\n\n"
-        f"🟡 رصيد محفظة البوت: 0 SYP\n"
-        f"💎 نقاط العرش: 22\n\n"
-        f"🆔 {user_id}"
-    )
-    
-    # ترتيب الأزرار لتبدو تماماً مثل الصورة المرفقة
+# بيانات المحافظ
+SYRIATEL_CASH_NUM = "1758507658" # رقم سيريتل كاش
+CHAM_CASH_WALLET = "80b363fb29781a600ed48c02f6fc77fb" # عنوان محفظة شام كاش
+
+def get_main_keyboard():
     keyboard = [
         ["🔵 حساب Ichancy"],
         ["📥 شحن محفظة البوت", "📤 سحب حوالة مالية"],
@@ -48,43 +51,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ["📅 السجلات", "💬 دعم الترا"],
         ["🎰 الدخول المباشر لألعاب الموقع"]
     ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(welcome_msg, reply_markup=reply_markup)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_name = update.effective_user.first_name
+    user_id = update.effective_user.id
     
-    if text == "🔵 حساب Ichancy":
-        await update.message.reply_text("قسم حساب Ichancy.")
-    elif text == "📥 شحن محفظة البوت":
-        await update.message.reply_text("لشحن محفظة البوت، يرجى اختيار طريقة الشحن المناسبة.")
-    elif text == "📤 سحب حوالة مالية":
-        await update.message.reply_text("لإتمام سحب الحوالة المالية، يرجى اتباع التعليمات.")
-    elif text == "💎 نقاط العرش":
-        await update.message.reply_text("رصيدك الحالي من نقاط العرش هو: 22 نقطة 💎")
-    elif text == "🎁 كود هدية":
-        await update.message.reply_text("أرسل كود الهدية الخاص بك.")
-    elif text == "🧧 إهداء رصيد":
-        await update.message.reply_text("أدخل تفاصيل إهداء الرصيد.")
-    elif text == "🔄 تعويض 5%":
-        await update.message.reply_text("تفاصيل نظام التعويض اليومي بنسبة 5%.")
-    elif text == "👥 الإحالات":
-        await update.message.reply_text("رابط الإحالة الخاص بك وأرباح الإحالات.")
-    elif text == "💽 عجلة الترا":
-        await update.message.reply_text("مرحباً بك في عجلة الترا الحظ.")
-    elif text == "📅 السجلات":
-        await update.message.reply_text("سجلات العمليات الخاصة بك.")
-    elif text == "💬 دعم الترا":
-        await update.message.reply_text("للتواصل مع فريق الدعم الفني.")
-    elif text == "🎰 الدخول المباشر لألعاب الموقع":
-        await update.message.reply_text("رابط الدخول المباشر لألعاب الموقع.")
-    else:
-        await update.message.reply_text("يرجى استخدام الأزرار الموجودة في القائمة.")
+    welcome_msg = (
+        f"اهلاً بك {user_name} في Ultra Bot bilas\n\n"
+        f"🟡 رصيد محفظة البوت: 0 SYP\n"
+        f"💎 نقاط العرش: 22\n\n"
+        f"🆔 {user_id}"
+    )
+    
+    await update.message.reply_text(welcome_msg, reply_markup=get_main_keyboard())
 
-if __name__ == '__main__':
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+# --- تدفق حساب Ichancy (إنشاء / تسجيل حساب) ---
+async def start_account_creation(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("يرجى كتابة اسم الحساب المطلوب:")
+    return WAITING_FOR_ACCOUNT_NAME
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    app.run_polling()
+async def receive_account_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['account_name'] = update.message.text
+    await update.message.reply_text("يرجى أدخال كلمة السر للحساب:")
+    return WAITING_FOR_ACCOUNT_
