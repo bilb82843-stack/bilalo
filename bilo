@@ -1,77 +1,72 @@
 import os
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from telegram import ReplyKeyboardMarkup, Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    ContextTypes,
-    MessageHandler,
-    ConversationHandler,
-    filters,
-)
+import telegram
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters, ConversationHandler, ReplyKeyboardMarkup
 
-# تعيين حالات المحادثة (Conversation States)
-WAITING_FOR_ACCOUNT_NAME, WAITING_FOR_ACCOUNT_PASS = range(2)
-WAITING_FOR_CHARGE_AMOUNT, WAITING_FOR_TRANSACTION_DETAILS = range(2, 4)
+# --- إعدادات المحادثة ---
+(WAITING_FOR_ACCOUNT_NAME, WAITING_FOR_ACCOUNT_PASS, 
+ WAITING_FOR_CHARGE_AMOUNT, WAITING_FOR_TRANSACTION_DETAILS) = range(4)
 
-# --- خادم وهمي لإرضاء منصة Render وتجاوز فحص الـ Port ---
+# --- كود الخادم الوهمي ---
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"Bot is running successfully!")
-
-    def log_message(self, format, *args):
-        pass
+        self.log_message = lambda format, *args: None
 
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8080))
     server = HTTPServer(("0.0.0.0", port), DummyHandler)
     server.serve_forever()
 
-# تشغيل الخادم الوهمي في خيط فرعي (Background Thread)
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# --- كود البوت الرئيسي ---
-BOT_TOKEN = "8526469344:AAHhWLZPmSh17mj0Z9EtqVTws-qZARZEijU"
+# --- بيانات المحافظ ---
+BOT_TOKEN = "8526469344:AAHhWLZPmSh17mj0Z9EtqVTws-qZARZEiJU"
+SYRIATEL_CASH_NUM = "1758507658"
+CHAM_CASH_WALLET = "80b363fb29781a600ed48c02f6fc77fb"
 
-# بيانات المحافظ
-SYRIATEL_CASH_NUM = "1758507658" # رقم سيريتل كاش
-CHAM_CASH_WALLET = "80b363fb29781a600ed48c02f6fc77fb" # عنوان محفظة شام كاش
-
+# --- الوظائف الأساسية ---
 def get_main_keyboard():
     keyboard = [
-        ["🔵 حساب Ichancy"],
+        ["💎 حساب Ichancy"],
         ["📥 شحن محفظة البوت", "📤 سحب حوالة مالية"],
         ["💎 نقاط العرش"],
         ["🎁 كود هدية", "🧧 إهداء رصيد"],
         ["🔄 تعويض 5%", "👥 الإحالات"],
-        ["💽 عجلة الترا"],
-        ["📅 السجلات", "💬 دعم الترا"],
-        ["🎰 الدخول المباشر لألعاب الموقع"]
+        ["🎡 عجلة الترا"],
+        ["📝 السجلات", "💬 دعم الترا"],
+        ["🌐 الدخول المباشر لألعاب الموقع"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
     user_id = update.effective_user.id
-    
     welcome_msg = (
-        f"اهلاً بك {user_name} في Ultra Bot bilas\n\n"
-        f"🟡 رصيد محفظة البوت: 0 SYP\n"
-        f"💎 نقاط العرش: 22\n\n"
-        f"🆔 {user_id}"
+        f"أهلاً بك {user_name} Ultra Bot bilas في \n\n"
+        f"SYP رصيد محفظة البوت : 0 🌕\n"
+        f"نقاط العرش : 22 💎\n\n"
+        f"ID: {user_id}"
     )
-    
     await update.message.reply_text(welcome_msg, reply_markup=get_main_keyboard())
 
-# --- تدفق حساب Ichancy (إنشاء / تسجيل حساب) ---
-async def start_account_creation(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("يرجى كتابة اسم الحساب المطلوب:")
-    return WAITING_FOR_ACCOUNT_NAME
+# --- دوال الشحن ---
+async def start_charge(update, context: ContextTypes.DEFAULT_TYPE):
+    charge_msg = (
+        f"لشحن محفظة البوت، يرجى التحويل إلى إحدى المحافظ التالية:\n\n"
+        f"سيريتيل كاش: `{SYRIATEL_CASH_NUM}`\n"
+        f"شام كاش: `{CHAM_CASH_WALLET}`\n\n"
+        f"ثم أرسل صورة أو رقم عملية التحويل."
+    )
+    await update.message.reply_text(charge_msg, parse_mode='MarkdownV2')
 
-async def receive_account_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['account_name'] = update.message.text
-    await update.message.reply_text("يرجى أدخال كلمة السر للحساب:")
-    return WAITING_FOR_ACCOUNT_
+# --- تشغيل البوت ---
+if __name__ == '__main__':
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(MessageHandler(filters.Text(["📥 شحن محفظة البوت"]), start_charge))
+
+    application.run_polling()
